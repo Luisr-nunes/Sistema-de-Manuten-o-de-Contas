@@ -1,16 +1,18 @@
 #ifndef VALIDACAO_H
 #define VALIDACAO_H
 
-// Interface de validacao de inputs.
-// Nao contem dependencias de db.h ou menu.h ("nao conhece db nem menu").
+#include <stddef.h>
 
-// Le uma string ate max_tamanho - 1, descartando caracteres excedentes no buffer de entrada.
-void ler_string(const char *mensagem, char *destino, int max_tamanho);
+int    val_ler_int(const char *prompt);
 
-// Le um numero inteiro no intervalo fechado [min_val, max_val] com validacao.
-int ler_inteiro(const char *mensagem, int min_val, int max_val);
+double val_ler_double(const char *prompt);
 
-// Le um numero decimal double no intervalo fechado [min_val, max_val] com validacao.
-double ler_double(const char *mensagem, double min_val, double max_val);
+int    val_ler_string(const char *prompt, char *buf, size_t max);
 
-#endif // VALIDACAO_H
+int    val_numero_conta(int numero);
+
+int    val_saldo(double saldo);
+
+int    val_saldo(double saldo);
+
+#endif
