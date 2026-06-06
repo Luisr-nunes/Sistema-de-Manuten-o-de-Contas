@@ -17,7 +17,7 @@ int val_ler_int(const char *prompt) {
             limpar_buffer();
             return valor;
         }
-        printf("  [!] Entrada inválida. Digite um número inteiro.\n");
+        printf("  [!] Entrada invalida. Digite um numero inteiro.\n");
         limpar_buffer();
     }
 }
@@ -30,7 +30,7 @@ double val_ler_double(const char *prompt) {
             limpar_buffer();
             return valor;
         }
-        printf("  [!] Entrada inválida. Digite um número.\n");
+        printf("  [!] Entrada invalida. Digite um numero.\n");
         limpar_buffer();
     }
 }
@@ -45,7 +45,7 @@ int val_ler_string(const char *prompt, char *buf, size_t max) {
 
             if (len > 0) return (int)len;
         }
-        printf("  [!] Texto não pode ser vazio.\n");
+        printf("  [!] Texto nao pode ser vazio.\n");
     }
 }
 

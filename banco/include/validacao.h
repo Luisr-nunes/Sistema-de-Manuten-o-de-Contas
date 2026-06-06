@@ -13,6 +13,4 @@ int    val_numero_conta(int numero);
 
 int    val_saldo(double saldo);
 
-int    val_saldo(double saldo);
-
 #endif

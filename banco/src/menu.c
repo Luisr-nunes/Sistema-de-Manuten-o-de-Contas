@@ -6,34 +6,33 @@
 #include "../include/validacao.h"
 #include "../include/menu.h"
 
-
 static void imprimir_cliente(const Cliente *c, int pos, void *userdata) {
-    (void)userdata;   
-    printf("  ┌─────────────────────────────────────┐\n");
-    printf("  │ Pos. arquivo : %d\n", pos);
-    printf("  │ Conta        : %d\n", c->numero);
-    printf("  │ Titular      : %s\n", c->nome);
-    printf("  │ Saldo        : R$ %.2f\n", c->saldo);
-    printf("  └─────────────────────────────────────┘\n");
+    (void)userdata;
+    printf("  +-------------------------------------+\n");
+    printf("  | Pos. arquivo : %d\n", pos);
+    printf("  | Conta        : %d\n", c->numero);
+    printf("  | Titular      : %s\n", c->nome);
+    printf("  | Saldo        : R$ %.2f\n", c->saldo);
+    printf("  +-------------------------------------+\n");
 }
 
 static void imprimir_status(DbStatus s) {
     switch (s) {
         case DB_OK:            break;
-        case DB_ERR_ARQUIVO:   puts("  [ERRO] Não foi possível abrir o arquivo de dados."); break;
+        case DB_ERR_ARQUIVO:   puts("  [ERRO] Nao foi possivel abrir o arquivo de dados."); break;
         case DB_ERR_IO:        puts("  [ERRO] Falha de leitura/escrita no arquivo.");        break;
-        case DB_ERR_NAO_FOUND: puts("  [ERRO] Conta não encontrada.");                       break;
-        case DB_ERR_DUPLICADO: puts("  [ERRO] Já existe uma conta com esse número.");        break;
-        case DB_ERR_SALDO:     puts("  [ERRO] Saldo insuficiente para esta operação.");      break;
+        case DB_ERR_NAO_FOUND: puts("  [ERRO] Conta nao encontrada.");                       break;
+        case DB_ERR_DUPLICADO: puts("  [ERRO] Ja existe uma conta com esse numero.");        break;
+        case DB_ERR_SALDO:     puts("  [ERRO] Saldo insuficiente para esta operacao.");      break;
     }
 }
 
 static void op_cadastrar(void) {
     puts("\n=== CADASTRAR NOVO CLIENTE ===");
 
-    int numero = val_ler_int("Número da conta: ");
+    int numero = val_ler_int("Numero da conta: ");
     if (!val_numero_conta(numero)) {
-        puts("  [!] Número de conta deve ser positivo."); return;
+        puts("  [!] Numero de conta deve ser positivo."); return;
     }
 
     Cliente c;
@@ -45,7 +44,7 @@ static void op_cadastrar(void) {
 
     double saldo = val_ler_double("Saldo inicial (R$): ");
     if (!val_saldo(saldo)) {
-        puts("  [!] Saldo inicial não pode ser negativo."); return;
+        puts("  [!] Saldo inicial nao pode ser negativo."); return;
     }
     c.saldo = saldo;
 
@@ -59,7 +58,7 @@ static void op_cadastrar(void) {
 static void op_consultar(void) {
     puts("\n=== CONSULTAR CLIENTE ===");
 
-    int numero = val_ler_int("Número da conta: ");
+    int numero = val_ler_int("Numero da conta: ");
     Cliente c;
     int pos;
 
@@ -73,7 +72,7 @@ static void op_consultar(void) {
 static void op_atualizar_saldo(void) {
     puts("\n=== ATUALIZAR SALDO ===");
 
-    int numero = val_ler_int("Número da conta: ");
+    int numero = val_ler_int("Numero da conta: ");
     Cliente c;
     int pos;
 
@@ -81,13 +80,13 @@ static void op_atualizar_saldo(void) {
     if (s != DB_OK) { imprimir_status(s); return; }
 
     printf("  Saldo atual: R$ %.2f\n", c.saldo);
-    puts("  1 - Depósito   2 - Saque   3 - Definir valor exato");
+    puts("  1 - Deposito   2 - Saque   3 - Definir valor exato");
 
-    int op = val_ler_int("  Opção: ");
-    if (op < 1 || op > 3) { puts("  [!] Opção inválida."); return; }
+    int op = val_ler_int("  Opcao: ");
+    if (op < 1 || op > 3) { puts("  [!] Opcao invalida."); return; }
 
     double valor = val_ler_double("  Valor (R$): ");
-    if (valor < 0) { puts("  [!] Valor não pode ser negativo."); return; }
+    if (valor < 0) { puts("  [!] Valor nao pode ser negativo."); return; }
 
     switch (op) {
         case 1:
@@ -98,7 +97,7 @@ static void op_atualizar_saldo(void) {
             c.saldo -= valor;
             break;
         case 3:
-            if (!val_saldo(valor)) { puts("  [!] Saldo inválido."); return; }
+            if (!val_saldo(valor)) { puts("  [!] Saldo invalido."); return; }
             c.saldo = valor;
             break;
     }
@@ -113,7 +112,7 @@ static void op_atualizar_saldo(void) {
 static void op_encerrar_conta(void) {
     puts("\n=== ENCERRAR CONTA ===");
 
-    int numero = val_ler_int("Número da conta: ");
+    int numero = val_ler_int("Numero da conta: ");
     Cliente c;
     int pos;
 
@@ -122,8 +121,8 @@ static void op_encerrar_conta(void) {
 
     imprimir_cliente(&c, pos, NULL);
 
-    int conf = val_ler_int("  Confirmar encerramento? (1=Sim / 0=Não): ");
-    if (conf != 1) { puts("  Operação cancelada."); return; }
+    int conf = val_ler_int("  Confirmar encerramento? (1=Sim / 0=Nao): ");
+    if (conf != 1) { puts("  Operacao cancelada."); return; }
 
     c.ativo = CONTA_INATIVA;
     s = db_atualizar(pos, &c);
@@ -149,7 +148,7 @@ static void op_listar(void) {
 
 static void op_restaurar_leitura(void) {
     puts("\n=== RESTAURAR LEITURA (rewind) ===");
-    puts("  Voltando ao início do arquivo e relendo todos os registros...\n");
+    puts("  Voltando ao inicio do arquivo e relendo todos os registros...\n");
 
     int total = db_listar(imprimir_cliente, NULL);
 
@@ -158,29 +157,28 @@ static void op_restaurar_leitura(void) {
     else if (total == 0)
         puts("  Nenhum cliente ativo encontrado.");
     else
-        printf("\n  [OK] Releitura concluída. Total: %d cliente(s).\n", total);
+        printf("\n  [OK] Releitura concluida. Total: %d cliente(s).\n", total);
 }
 
-
 static void imprimir_menu(void) {
-    puts("\n╔══════════════════════════════════════════╗");
-    puts("║        SISTEMA BANCÁRIO — MENU           ║");
-    puts("╠══════════════════════════════════════════╣");
-    puts("║  1. Cadastrar novo cliente               ║");
-    puts("║  2. Consultar cliente                    ║");
-    puts("║  3. Atualizar saldo                      ║");
-    puts("║  4. Encerrar conta                       ║");
-    puts("║  5. Listar todos os clientes             ║");
-    puts("║  6. Restaurar leitura (rewind)           ║");
-    puts("║  7. Encerrar programa                    ║");
-    puts("╚══════════════════════════════════════════╝");
+    puts("\n+==========================================+");
+    puts("|        SISTEMA BANCARIO -- MENU          |");
+    puts("+==========================================+");
+    puts("|  1. Cadastrar novo cliente               |");
+    puts("|  2. Consultar cliente                    |");
+    puts("|  3. Atualizar saldo                      |");
+    puts("|  4. Encerrar conta                       |");
+    puts("|  5. Listar todos os clientes             |");
+    puts("|  6. Restaurar leitura (rewind)           |");
+    puts("|  7. Encerrar programa                    |");
+    puts("+==========================================+");
 }
 
 void menu_executar(void) {
     int opcao;
     do {
         imprimir_menu();
-        opcao = val_ler_int("Opção: ");
+        opcao = val_ler_int("Opcao: ");
 
         switch (opcao) {
             case 1: op_cadastrar();         break;
@@ -189,8 +187,8 @@ void menu_executar(void) {
             case 4: op_encerrar_conta();    break;
             case 5: op_listar();            break;
             case 6: op_restaurar_leitura(); break;
-            case 7: puts("\nEncerrando o sistema. Até logo!\n"); break;
-            default: puts("  [!] Opção inválida. Escolha entre 1 e 7.");
+            case 7: puts("\nEncerrando o sistema. Ate logo!\n"); break;
+            default: puts("  [!] Opcao invalida. Escolha entre 1 e 7.");
         }
 
     } while (opcao != 7);
