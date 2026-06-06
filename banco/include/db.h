@@ -4,30 +4,24 @@
 #include "cliente.h"
 
 typedef enum {
-    DB_OK,
-    DB_ERRO_ABERTURA,
-    DB_ERRO_ESCRITA,
-    DB_ERRO_LEITURA,
-    DB_NAO_ENCONTRADO,
-    DB_DUPLICADO
+    DB_OK            =  0,
+    DB_ERR_ARQUIVO   = -1,  
+    DB_ERR_IO        = -2,  
+    DB_ERR_NAO_FOUND = -3,  
+    DB_ERR_DUPLICADO = -4,   
+    DB_ERR_SALDO     = -5    
 } DbStatus;
 
-// Inicializa o arquivo do banco de dados se necessario
-DbStatus db_inicializar(void);
+int db_total_registros(void);
 
-// Insere um novo cliente (evitando duplicados e reutilizando espaco deletado logico se possivel)
-DbStatus db_inserir(const Cliente *cliente);
+DbStatus db_buscar(int numero, Cliente *out, int *pos_out);
 
-// Busca um cliente pelo ID
-DbStatus db_buscar(int id, Cliente *cliente);
+DbStatus db_inserir(const Cliente *c);
 
-// Atualiza os dados de um cliente existente
-DbStatus db_atualizar(const Cliente *cliente);
+DbStatus db_atualizar(int pos, const Cliente *c);
 
-// Realiza a exclusao logica (ativo = 0) do cliente
-DbStatus db_excluir(int id);
 
-// Carrega todos os clientes ativos em um array
-DbStatus db_listar(Cliente *clientes, int max_clientes, int *total_retornado);
+typedef void (*db_iter_fn)(const Cliente *c, int pos, void *userdata);
+int db_listar(db_iter_fn callback, void *userdata);
 
-#endif // DB_H
+#endif 
