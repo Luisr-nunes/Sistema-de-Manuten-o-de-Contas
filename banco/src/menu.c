@@ -1,204 +1,197 @@
-#include "menu.h"
-#include "db.h"
-#include "validacao.h"
 #include <stdio.h>
 #include <string.h>
 
-static void exibir_status(DbStatus status) {
-    switch (status) {
-        case DB_OK:
-            printf("\n>>> [SUCESSO] Operacao realizada com sucesso!\n");
-            break;
-        case DB_ERRO_ABERTURA:
-            printf("\n>>> [ERRO CRITICO] Falha ao abrir o banco de dados. Verifique permissoes.\n");
-            break;
-        case DB_ERRO_ESCRITA:
-            printf("\n>>> [ERRO CRITICO] Falha ao gravar dados no disco.\n");
-            break;
-        case DB_ERRO_LEITURA:
-            printf("\n>>> [ERRO CRITICO] Falha ao ler dados do disco.\n");
-            break;
-        case DB_NAO_ENCONTRADO:
-            printf("\n>>> [ERRO] Cliente nao encontrado.\n");
-            break;
-        case DB_DUPLICADO:
-            printf("\n>>> [ERRO] ID ja cadastrado no sistema.\n");
-            break;
-        default:
-            printf("\n>>> [ERRO] Ocorreu um erro desconhecido.\n");
-            break;
+#include "../include/cliente.h"
+#include "../include/db.h"
+#include "../include/validacao.h"
+#include "../include/menu.h"
+
+
+static void imprimir_cliente(const Cliente *c, int pos, void *userdata) {
+    (void)userdata;   
+    printf("  ┌─────────────────────────────────────┐\n");
+    printf("  │ Pos. arquivo : %d\n", pos);
+    printf("  │ Conta        : %d\n", c->numero);
+    printf("  │ Titular      : %s\n", c->nome);
+    printf("  │ Saldo        : R$ %.2f\n", c->saldo);
+    printf("  └─────────────────────────────────────┘\n");
+}
+
+static void imprimir_status(DbStatus s) {
+    switch (s) {
+        case DB_OK:            break;
+        case DB_ERR_ARQUIVO:   puts("  [ERRO] Não foi possível abrir o arquivo de dados."); break;
+        case DB_ERR_IO:        puts("  [ERRO] Falha de leitura/escrita no arquivo.");        break;
+        case DB_ERR_NAO_FOUND: puts("  [ERRO] Conta não encontrada.");                       break;
+        case DB_ERR_DUPLICADO: puts("  [ERRO] Já existe uma conta com esse número.");        break;
+        case DB_ERR_SALDO:     puts("  [ERRO] Saldo insuficiente para esta operação.");      break;
     }
 }
 
-static void cadastrar_cliente(void) {
-    Cliente c;
-    printf("\n--- Cadastrar Novo Cliente ---\n");
-    c.id = ler_inteiro("Digite o ID (1 - 999999): ", 1, 999999);
+static void op_cadastrar(void) {
+    puts("\n=== CADASTRAR NOVO CLIENTE ===");
 
-    // Verifica duplicado preliminarmente antes de pedir demais informacoes
-    Cliente temp;
-    DbStatus status = db_buscar(c.id, &temp);
-    if (status == DB_OK) {
-        exibir_status(DB_DUPLICADO);
-        return;
+    int numero = val_ler_int("Número da conta: ");
+    if (!val_numero_conta(numero)) {
+        puts("  [!] Número de conta deve ser positivo."); return;
     }
-
-    ler_string("Digite o Nome do Cliente: ", c.nome, MAX_NOME);
-    if (strlen(c.nome) == 0) {
-        strcpy(c.nome, "Sem Nome");
-    }
-
-    ler_string("Digite o CPF (apenas numeros ou formatado): ", c.cpf, MAX_CPF);
-    if (strlen(c.cpf) == 0) {
-        strcpy(c.cpf, "000.000.000-00");
-    }
-
-    c.saldo = ler_double("Digite o Saldo Inicial: ", 0.0, 999999999.99);
-    c.ativo = 1; // Registro ativo
-
-    status = db_inserir(&c);
-    exibir_status(status);
-}
-
-static void consultar_cliente(void) {
-    printf("\n--- Consultar Cliente ---\n");
-    int id = ler_inteiro("Digite o ID a buscar: ", 1, 999999);
 
     Cliente c;
-    DbStatus status = db_buscar(id, &c);
-    if (status == DB_OK) {
-        printf("\n==================================================\n");
-        printf(" ID:      %d\n", c.id);
-        printf(" Nome:    %s\n", c.nome);
-        printf(" CPF:     %s\n", c.cpf);
-        printf(" Saldo:   R$ %.2f\n", c.saldo);
-        printf("==================================================\n");
-    } else {
-        exibir_status(status);
+    memset(&c, 0, sizeof(Cliente));
+    c.numero = numero;
+    c.ativo  = CONTA_ATIVA;
+
+    val_ler_string("Nome do titular: ", c.nome, MAX_NOME);
+
+    double saldo = val_ler_double("Saldo inicial (R$): ");
+    if (!val_saldo(saldo)) {
+        puts("  [!] Saldo inicial não pode ser negativo."); return;
     }
+    c.saldo = saldo;
+
+    DbStatus s = db_inserir(&c);
+    if (s == DB_OK)
+        printf("  [OK] Cliente '%s' (conta %d) cadastrado.\n", c.nome, c.numero);
+    else
+        imprimir_status(s);
 }
 
-static void atualizar_cliente(void) {
-    printf("\n--- Atualizar Cliente ---\n");
-    int id = ler_inteiro("Digite o ID do cliente a atualizar: ", 1, 999999);
+static void op_consultar(void) {
+    puts("\n=== CONSULTAR CLIENTE ===");
 
+    int numero = val_ler_int("Número da conta: ");
     Cliente c;
-    DbStatus status = db_buscar(id, &c);
-    if (status != DB_OK) {
-        exibir_status(status);
-        return;
-    }
+    int pos;
 
-    printf("\nCliente encontrado:\n");
-    printf("Nome atual: %s | CPF atual: %s | Saldo atual: R$ %.2f\n\n", c.nome, c.cpf, c.saldo);
-
-    char novo_nome[MAX_NOME];
-    ler_string("Digite o Novo Nome (deixe em branco para manter): ", novo_nome, MAX_NOME);
-    if (strlen(novo_nome) > 0) {
-        strcpy(c.nome, novo_nome);
-    }
-
-    char novo_cpf[MAX_CPF];
-    ler_string("Digite o Novo CPF (deixe em branco para manter): ", novo_cpf, MAX_CPF);
-    if (strlen(novo_cpf) > 0) {
-        strcpy(c.cpf, novo_cpf);
-    }
-
-    printf("Deseja alterar o saldo? (1 - Sim, 0 - Nao)\n");
-    int alterar_saldo = ler_inteiro("Opcao: ", 0, 1);
-    if (alterar_saldo) {
-        c.saldo = ler_double("Digite o Novo Saldo: ", 0.0, 999999999.99);
-    }
-
-    status = db_atualizar(&c);
-    exibir_status(status);
+    DbStatus s = db_buscar(numero, &c, &pos);
+    if (s == DB_OK)
+        imprimir_cliente(&c, pos, NULL);
+    else
+        imprimir_status(s);
 }
 
-static void excluir_cliente(void) {
-    printf("\n--- Excluir Cliente ---\n");
-    int id = ler_inteiro("Digite o ID a excluir: ", 1, 999999);
+static void op_atualizar_saldo(void) {
+    puts("\n=== ATUALIZAR SALDO ===");
 
+    int numero = val_ler_int("Número da conta: ");
     Cliente c;
-    DbStatus status = db_buscar(id, &c);
-    if (status != DB_OK) {
-        exibir_status(status);
-        return;
+    int pos;
+
+    DbStatus s = db_buscar(numero, &c, &pos);
+    if (s != DB_OK) { imprimir_status(s); return; }
+
+    printf("  Saldo atual: R$ %.2f\n", c.saldo);
+    puts("  1 - Depósito   2 - Saque   3 - Definir valor exato");
+
+    int op = val_ler_int("  Opção: ");
+    if (op < 1 || op > 3) { puts("  [!] Opção inválida."); return; }
+
+    double valor = val_ler_double("  Valor (R$): ");
+    if (valor < 0) { puts("  [!] Valor não pode ser negativo."); return; }
+
+    switch (op) {
+        case 1:
+            c.saldo += valor;
+            break;
+        case 2:
+            if (valor > c.saldo) { imprimir_status(DB_ERR_SALDO); return; }
+            c.saldo -= valor;
+            break;
+        case 3:
+            if (!val_saldo(valor)) { puts("  [!] Saldo inválido."); return; }
+            c.saldo = valor;
+            break;
     }
 
-    printf("\nCliente encontrado: %s (ID: %d)\n", c.nome, c.id);
-    printf("Confirmar exclusao? (1 - Sim, 0 - Nao)\n");
-    int confirmar = ler_inteiro("Opcao: ", 0, 1);
-    if (confirmar) {
-        status = db_excluir(id);
-        exibir_status(status);
-    } else {
-        printf("\nExclusao cancelada.\n");
-    }
+    s = db_atualizar(pos, &c);
+    if (s == DB_OK)
+        printf("  [OK] Saldo atualizado. Novo saldo: R$ %.2f\n", c.saldo);
+    else
+        imprimir_status(s);
 }
 
-static void listar_clientes(void) {
-    printf("\n--- Lista de Clientes ---\n");
-    Cliente lista[128];
-    int total = 0;
-    DbStatus status = db_listar(lista, 128, &total);
+static void op_encerrar_conta(void) {
+    puts("\n=== ENCERRAR CONTA ===");
 
-    if (status != DB_OK) {
-        exibir_status(status);
-        return;
-    }
+    int numero = val_ler_int("Número da conta: ");
+    Cliente c;
+    int pos;
 
-    if (total == 0) {
-        printf("\nNenhum cliente cadastrado no momento.\n");
-        return;
-    }
+    DbStatus s = db_buscar(numero, &c, &pos);
+    if (s != DB_OK) { imprimir_status(s); return; }
 
-    printf("\n%-6s | %-25s | %-15s | %-12s\n", "ID", "Nome", "CPF", "Saldo");
-    printf("-------------------------------------------------------------------\n");
-    for (int i = 0; i < total; i++) {
-        printf("%-6d | %-25.25s | %-15s | R$ %-10.2f\n", 
-               lista[i].id, lista[i].nome, lista[i].cpf, lista[i].saldo);
-    }
-    printf("-------------------------------------------------------------------\n");
-    printf("Total de registros ativos: %d\n", total);
+    imprimir_cliente(&c, pos, NULL);
+
+    int conf = val_ler_int("  Confirmar encerramento? (1=Sim / 0=Não): ");
+    if (conf != 1) { puts("  Operação cancelada."); return; }
+
+    c.ativo = CONTA_INATIVA;
+    s = db_atualizar(pos, &c);
+
+    if (s == DB_OK)
+        printf("  [OK] Conta %d encerrada.\n", numero);
+    else
+        imprimir_status(s);
+}
+
+static void op_listar(void) {
+    puts("\n=== TODOS OS CLIENTES ===");
+
+    int total = db_listar(imprimir_cliente, NULL);
+
+    if (total == (int)DB_ERR_ARQUIVO)
+        imprimir_status(DB_ERR_ARQUIVO);
+    else if (total == 0)
+        puts("  Nenhum cliente ativo encontrado.");
+    else
+        printf("\n  Total de clientes ativos: %d\n", total);
+}
+
+static void op_restaurar_leitura(void) {
+    puts("\n=== RESTAURAR LEITURA (rewind) ===");
+    puts("  Voltando ao início do arquivo e relendo todos os registros...\n");
+
+    int total = db_listar(imprimir_cliente, NULL);
+
+    if (total == (int)DB_ERR_ARQUIVO)
+        imprimir_status(DB_ERR_ARQUIVO);
+    else if (total == 0)
+        puts("  Nenhum cliente ativo encontrado.");
+    else
+        printf("\n  [OK] Releitura concluída. Total: %d cliente(s).\n", total);
+}
+
+
+static void imprimir_menu(void) {
+    puts("\n╔══════════════════════════════════════════╗");
+    puts("║        SISTEMA BANCÁRIO — MENU           ║");
+    puts("╠══════════════════════════════════════════╣");
+    puts("║  1. Cadastrar novo cliente               ║");
+    puts("║  2. Consultar cliente                    ║");
+    puts("║  3. Atualizar saldo                      ║");
+    puts("║  4. Encerrar conta                       ║");
+    puts("║  5. Listar todos os clientes             ║");
+    puts("║  6. Restaurar leitura (rewind)           ║");
+    puts("║  7. Encerrar programa                    ║");
+    puts("╚══════════════════════════════════════════╝");
 }
 
 void menu_executar(void) {
-    // Inicializa o BD
-    db_inicializar();
-
-    int opcao = -1;
-    while (opcao != 0) {
-        printf("\n========================================\n");
-        printf("    SISTEMA DE MANUTENCAO DE CONTAS     \n");
-        printf("========================================\n");
-        printf("  1. Cadastrar Cliente\n");
-        printf("  2. Consultar Cliente por ID\n");
-        printf("  3. Atualizar Cliente\n");
-        printf("  4. Excluir Cliente\n");
-        printf("  5. Listar Todos os Clientes\n");
-        printf("  0. Sair\n");
-        printf("========================================\n");
-        opcao = ler_inteiro("Escolha uma opcao: ", 0, 5);
+    int opcao;
+    do {
+        imprimir_menu();
+        opcao = val_ler_int("Opção: ");
 
         switch (opcao) {
-            case 1:
-                cadastrar_cliente();
-                break;
-            case 2:
-                consultar_cliente();
-                break;
-            case 3:
-                atualizar_cliente();
-                break;
-            case 4:
-                excluir_cliente();
-                break;
-            case 5:
-                listar_clientes();
-                break;
-            case 0:
-                printf("\nSaindo do sistema. Ate breve!\n");
-                break;
+            case 1: op_cadastrar();         break;
+            case 2: op_consultar();         break;
+            case 3: op_atualizar_saldo();   break;
+            case 4: op_encerrar_conta();    break;
+            case 5: op_listar();            break;
+            case 6: op_restaurar_leitura(); break;
+            case 7: puts("\nEncerrando o sistema. Até logo!\n"); break;
+            default: puts("  [!] Opção inválida. Escolha entre 1 e 7.");
         }
-    }
+
+    } while (opcao != 7);
 }
