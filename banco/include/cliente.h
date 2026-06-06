@@ -1,15 +1,16 @@
 #ifndef CLIENTE_H
 #define CLIENTE_H
 
-#define MAX_NOME 50
-#define MAX_CPF 15
+#define ARQUIVO_BANCO   "contas.dat"
+#define MAX_NOME        50
+#define CONTA_ATIVA     1
+#define CONTA_INATIVA   0
 
 typedef struct {
-    int id;
-    char nome[MAX_NOME];
-    char cpf[MAX_CPF];
-    double saldo;
-    int ativo; // 1 = ativo, 0 = inativo (exclusao logica)
+    int    numero;         
+    char   nome[MAX_NOME]; 
+    double saldo;            
+    int    ativo;            
 } Cliente;
 
-#endif // CLIENTE_H
+#endif
