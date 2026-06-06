@@ -1,4 +1,4 @@
-# 🏦 Sistema de Manutenção de Contas Bancárias
+#  Sistema de Manutenção de Contas Bancárias
 
 > Projeto acadêmico desenvolvido em **C11** com arquitetura modular em camadas, operações de arquivo binário e padrão de organização inspirado em princípios CRUD/enterprise.
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📋 Sumário
+##  Sumário
 
 - [Sobre o Projeto](#sobre-o-projeto)
 - [Funcionalidades](#funcionalidades)
