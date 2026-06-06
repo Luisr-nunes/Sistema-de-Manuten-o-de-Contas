@@ -1,187 +1,113 @@
-#include "db.h"
 #include <stdio.h>
 #include <string.h>
-
-static const char *DB_ARQUIVO = "contas.dat";
-
-DbStatus db_inicializar(void) {
-    // Abre no modo "ab" para criar o arquivo caso nao exista
-    FILE *f = fopen(DB_ARQUIVO, "ab");
-    if (f == NULL) {
-        return DB_ERRO_ABERTURA;
+ 
+#include "../include/cliente.h"
+#include "../include/db.h"
+ 
+ 
+static FILE *db_abrir(void) {
+    FILE *fp = fopen(ARQUIVO_BANCO, "r+b");
+    if (!fp) {
+       
+        fp = fopen(ARQUIVO_BANCO, "w+b");
     }
-    fclose(f);
-    return DB_OK;
+    return fp;   
 }
-
-DbStatus db_inserir(const Cliente *cliente) {
-    // Abre para leitura e escrita binaria.
-    FILE *f = fopen(DB_ARQUIVO, "r+b");
-    if (f == NULL) {
-        // Se falhar, tenta "wb" (caso o arquivo nao exista por algum motivo) e depois reabre "r+b"
-        f = fopen(DB_ARQUIVO, "wb");
-        if (f == NULL) return DB_ERRO_ABERTURA;
-        fclose(f);
-        f = fopen(DB_ARQUIVO, "r+b");
-        if (f == NULL) return DB_ERRO_ABERTURA;
-    }
-
-    Cliente temp;
-    long slot_inativo_offset = -1;
-
-    // Garante que o ID nao seja duplicado e aproveita o primeiro espaco inativo encontrado
-    rewind(f);
-    while (fread(&temp, sizeof(Cliente), 1, f) == 1) {
-        if (temp.ativo) {
-            if (temp.id == cliente->id) {
-                fclose(f);
-                return DB_DUPLICADO;
-            }
-        } else {
-            if (slot_inativo_offset == -1) {
-                slot_inativo_offset = ftell(f) - sizeof(Cliente);
-            }
-        }
-    }
-
-    // Posiciona o ponteiro de arquivo
-    if (slot_inativo_offset != -1) {
-        // Reutiliza slot inativo
-        if (fseek(f, slot_inativo_offset, SEEK_SET) != 0) {
-            fclose(f);
-            return DB_ERRO_ESCRITA;
-        }
-    } else {
-        // Vai para o final do arquivo
-        if (fseek(f, 0, SEEK_END) != 0) {
-            fclose(f);
-            return DB_ERRO_ESCRITA;
-        }
-    }
-
-    // Escreve o novo registro
-    if (fwrite(cliente, sizeof(Cliente), 1, f) != 1) {
-        fclose(f);
-        return DB_ERRO_ESCRITA;
-    }
-
-    fclose(f);
-    return DB_OK;
+ 
+static long offset_de(int pos) {
+    return (long)(pos) * (long)sizeof(Cliente);
 }
-
-DbStatus db_buscar(int id, Cliente *cliente) {
-    FILE *f = fopen(DB_ARQUIVO, "rb");
-    if (f == NULL) {
-        return DB_ERRO_ABERTURA;
+  
+int db_total_registros(void) {
+    FILE *fp = db_abrir();
+    if (!fp) return 0;
+ 
+    fseek(fp, 0L, SEEK_END);
+    long tamanho = ftell(fp);
+    fclose(fp);
+ 
+    return (int)(tamanho / (long)sizeof(Cliente));
+}
+ 
+DbStatus db_buscar(int numero, Cliente *out, int *pos_out) {
+    FILE *fp = db_abrir();
+    if (!fp) return DB_ERR_ARQUIVO;
+ 
+    int total = db_total_registros();
+    Cliente tmp;
+ 
+    for (int i = 0; i < total; i++) {
+        fseek(fp, offset_de(i), SEEK_SET);
+        if (fread(&tmp, sizeof(Cliente), 1, fp) != 1) continue;
+        if (tmp.ativo == CONTA_ATIVA && tmp.numero == numero) {
+            if (out)     *out     = tmp;
+            if (pos_out) *pos_out = i;
+            fclose(fp);
+            return DB_OK;
+        }
     }
-
-    Cliente temp;
-    int encontrado = 0;
-    while (fread(&temp, sizeof(Cliente), 1, f) == 1) {
-        if (temp.ativo && temp.id == id) {
-            *cliente = temp;
-            encontrado = 1;
+ 
+    fclose(fp);
+    return DB_ERR_NAO_FOUND;
+}
+ 
+DbStatus db_inserir(const Cliente *c) {
+    if (db_buscar(c->numero, NULL, NULL) == DB_OK)
+        return DB_ERR_DUPLICADO;
+ 
+    FILE *fp = db_abrir();
+    if (!fp) return DB_ERR_ARQUIVO;
+ 
+    int   total = db_total_registros();
+    int   slot  = total;   
+    Cliente tmp;
+ 
+    for (int i = 0; i < total; i++) {
+        fseek(fp, offset_de(i), SEEK_SET);
+        if (fread(&tmp, sizeof(Cliente), 1, fp) == 1 && tmp.ativo == CONTA_INATIVA) {
+            slot = i;
             break;
         }
     }
-
-    fclose(f);
-    return encontrado ? DB_OK : DB_NAO_ENCONTRADO;
+ 
+    fseek(fp, offset_de(slot), SEEK_SET);
+    DbStatus status = (fwrite(c, sizeof(Cliente), 1, fp) == 1) ? DB_OK : DB_ERR_IO;
+ 
+    fclose(fp);
+    return status;
 }
-
-DbStatus db_atualizar(const Cliente *cliente) {
-    FILE *f = fopen(DB_ARQUIVO, "r+b");
-    if (f == NULL) {
-        return DB_ERRO_ABERTURA;
-    }
-
-    Cliente temp;
-    long offset = -1;
-    while (fread(&temp, sizeof(Cliente), 1, f) == 1) {
-        if (temp.ativo && temp.id == cliente->id) {
-            offset = ftell(f) - sizeof(Cliente);
-            break;
+ 
+DbStatus db_atualizar(int pos, const Cliente *c) {
+    FILE *fp = db_abrir();
+    if (!fp) return DB_ERR_ARQUIVO;
+ 
+    fseek(fp, offset_de(pos), SEEK_SET);
+    DbStatus status = (fwrite(c, sizeof(Cliente), 1, fp) == 1) ? DB_OK : DB_ERR_IO;
+ 
+    fclose(fp);
+    return status;
+}
+ 
+int db_listar(db_iter_fn callback, void *userdata) {
+    FILE *fp = db_abrir();
+    if (!fp) return DB_ERR_ARQUIVO;
+ 
+    int total = db_total_registros();
+ 
+    rewind(fp);
+ 
+    Cliente c;
+    int encontrados = 0;
+ 
+    for (int i = 0; i < total; i++) {
+        if (fread(&c, sizeof(Cliente), 1, fp) != 1) break;
+        if (c.ativo == CONTA_ATIVA) {
+            if (callback) callback(&c, i, userdata);
+            encontrados++;
         }
     }
-
-    if (offset == -1) {
-        fclose(f);
-        return DB_NAO_ENCONTRADO;
-    }
-
-    // Vai para a posicao do registro
-    if (fseek(f, offset, SEEK_SET) != 0) {
-        fclose(f);
-        return DB_ERRO_ESCRITA;
-    }
-
-    // Sobreescreve o registro
-    if (fwrite(cliente, sizeof(Cliente), 1, f) != 1) {
-        fclose(f);
-        return DB_ERRO_ESCRITA;
-    }
-
-    fclose(f);
-    return DB_OK;
+ 
+    fclose(fp);
+    return encontrados;
 }
-
-DbStatus db_excluir(int id) {
-    FILE *f = fopen(DB_ARQUIVO, "r+b");
-    if (f == NULL) {
-        return DB_ERRO_ABERTURA;
-    }
-
-    Cliente temp;
-    long offset = -1;
-    while (fread(&temp, sizeof(Cliente), 1, f) == 1) {
-        if (temp.ativo && temp.id == id) {
-            offset = ftell(f) - sizeof(Cliente);
-            temp.ativo = 0; // Marca como inativo (exclusao logica)
-            break;
-        }
-    }
-
-    if (offset == -1) {
-        fclose(f);
-        return DB_NAO_ENCONTRADO;
-    }
-
-    // Vai para a posicao do registro
-    if (fseek(f, offset, SEEK_SET) != 0) {
-        fclose(f);
-        return DB_ERRO_ESCRITA;
-    }
-
-    // Sobreescreve com o registro inativado
-    if (fwrite(&temp, sizeof(Cliente), 1, f) != 1) {
-        fclose(f);
-        return DB_ERRO_ESCRITA;
-    }
-
-    fclose(f);
-    return DB_OK;
-}
-
-DbStatus db_listar(Cliente *clientes, int max_clientes, int *total_retornado) {
-    FILE *f = fopen(DB_ARQUIVO, "rb");
-    if (f == NULL) {
-        return DB_ERRO_ABERTURA;
-    }
-
-    Cliente temp;
-    int contador = 0;
-    while (fread(&temp, sizeof(Cliente), 1, f) == 1) {
-        if (temp.ativo) {
-            if (contador < max_clientes) {
-                clientes[contador] = temp;
-                contador++;
-            } else {
-                break;
-            }
-        }
-    }
-
-    *total_retornado = contador;
-    fclose(f);
-    return DB_OK;
-}
+ 
