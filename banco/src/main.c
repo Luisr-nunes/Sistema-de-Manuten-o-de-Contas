@@ -12,3 +12,4 @@ int main(void) {
     menu_executar();
  
     return EXIT_SUCCESS;
+}
